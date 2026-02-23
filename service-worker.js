@@ -1,11 +1,11 @@
-const CACHE_NAME = "visiting-card-ocr-v2";
+const CACHE_NAME = "visiting-card-ocr-v3";
+
 const urlsToCache = [
   "./",
   "./index.html",
   "./manifest.json"
 ];
 
-// Install SW
 self.addEventListener("install", event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
@@ -15,7 +15,6 @@ self.addEventListener("install", event => {
   self.skipWaiting();
 });
 
-// Activate SW
 self.addEventListener("activate", event => {
   event.waitUntil(
     caches.keys().then(cacheNames =>
@@ -31,11 +30,17 @@ self.addEventListener("activate", event => {
   self.clients.claim();
 });
 
-// Fetch (Offline Support)
+// Network first, fallback to cache
 self.addEventListener("fetch", event => {
   event.respondWith(
-    caches.match(event.request).then(response => {
-      return response || fetch(event.request);
-    })
+    fetch(event.request)
+      .then(response => {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then(cache => {
+          cache.put(event.request, clone);
+        });
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
