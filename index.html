@@ -5,25 +5,47 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Visiting Card OCR Scanner</title>
 
-<link rel="manifest" href="manifest.json" />
+<link rel="manifest" href="manifest.json">
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<script async src="https://docs.opencv.org/4.x/opencv.js"></script>
 
 <style>
-body { margin:0; font-family:Arial; background:#0f172a; color:white; }
-.container { max-width:500px; margin:auto; padding:16px; }
-button { width:100%; padding:12px; margin-top:10px; border-radius:10px; border:none; background:#2563eb; color:white; font-size:16px; }
-input { width:100%; padding:10px; margin-top:8px; border-radius:8px; border:1px solid #334155; background:#020617; color:white; }
-#cameraSection { display:none; position:relative; }
-#video { width:100%; border-radius:12px; }
-.card-overlay {
-  position:absolute;
-  top:20%; left:10%;
-  width:80%; height:50%;
-  border:3px dashed #38bdf8;
-  border-radius:8px;
-  pointer-events:none;
+body {
+  margin: 0;
+  font-family: Arial;
+  background: #0f172a;
+  color: white;
+}
+.container {
+  max-width: 500px;
+  margin: auto;
+  padding: 16px;
+}
+button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  border-radius: 10px;
+  border: none;
+  background: #2563eb;
+  color: white;
+  font-size: 16px;
+}
+input {
+  width: 100%;
+  padding: 10px;
+  margin-top: 8px;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #020617;
+  color: white;
+}
+#cameraSection {
+  display: none;
+}
+#video {
+  width: 100%;
+  border-radius: 12px;
 }
 </style>
 </head>
@@ -34,17 +56,16 @@ input { width:100%; padding:10px; margin-top:8px; border-radius:8px; border:1px 
 <h2>Visiting Card Scanner</h2>
 
 <button onclick="openCamera()">📷 Scan Card</button>
-<input type="file" accept="image/*" onchange="uploadImage(event)" />
+<input type="file" accept="image/*" onchange="uploadImage(event)">
 
 <div id="cameraSection">
   <video id="video" playsinline></video>
-  <div class="card-overlay"></div>
   <button onclick="captureImage()">Capture</button>
   <button onclick="closeCamera()">Close</button>
 </div>
 
 <canvas id="canvas" style="display:none;"></canvas>
-<img id="preview" width="100%" />
+<img id="preview" width="100%">
 
 <div id="status">Ready...</div>
 
@@ -64,178 +85,188 @@ input { width:100%; padding:10px; margin-top:8px; border-radius:8px; border:1px 
 let stream;
 const GOOGLE_SCRIPT_URL = "https://script.google.com/a/macros/1mg.com/s/AKfycbzcPmeMEi0N-nnZHWrk3O9ouosrxnsPC18lSc07iPwDTi5nRw56xQfTGT_U6s0iiBvrFw/exec";
 
+/* CAMERA CONTROL */
+
 async function openCamera() {
   document.getElementById("cameraSection").style.display = "block";
-  stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment" } });
+  stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "environment" }
+  });
   video.srcObject = stream;
   video.play();
 }
 
 function closeCamera() {
-  if(stream) stream.getTracks().forEach(t=>t.stop());
+  if (stream) stream.getTracks().forEach(track => track.stop());
   document.getElementById("cameraSection").style.display = "none";
 }
 
-async function captureImage() {
+function captureImage() {
   const canvas = document.getElementById("canvas");
   const ctx = canvas.getContext("2d");
 
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
-  ctx.drawImage(video,0,0);
+
+  ctx.drawImage(video, 0, 0);
 
   closeCamera();
-  processCard(canvas);
+  processImage(canvas);
 }
 
-function uploadImage(event){
+/* UPLOAD IMAGE */
+
+function uploadImage(event) {
   const file = event.target.files[0];
-  if(!file) return;
+  if (!file) return;
 
   const img = new Image();
-  img.onload = function(){
+  img.onload = function () {
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
+
     canvas.width = img.width;
     canvas.height = img.height;
-    ctx.drawImage(img,0,0);
-    processCard(canvas);
+
+    ctx.drawImage(img, 0, 0);
+
+    processImage(canvas);
   };
   img.src = URL.createObjectURL(file);
 }
 
-function processCard(canvas){
+/* IMAGE PROCESSING (Stable Version) */
 
-  if(typeof cv === "undefined"){
-    runOCR(canvas);
-    return;
+function processImage(canvas) {
+
+  const ctx = canvas.getContext("2d");
+
+  let imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  let data = imgData.data;
+
+  // Contrast boost for better OCR
+  let contrast = 40;
+  let factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+
+  for (let i = 0; i < data.length; i += 4) {
+    data[i]     = factor * (data[i] - 128) + 128;
+    data[i + 1] = factor * (data[i + 1] - 128) + 128;
+    data[i + 2] = factor * (data[i + 2] - 128) + 128;
   }
 
-  let src = cv.imread(canvas);
-  let gray = new cv.Mat();
-  let edges = new cv.Mat();
-  let contours = new cv.MatVector();
-  let hierarchy = new cv.Mat();
+  ctx.putImageData(imgData, 0, 0);
 
-  cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);
-  cv.GaussianBlur(gray,gray,new cv.Size(5,5),0);
-  cv.Canny(gray,edges,75,200);
+  // Auto rotate if vertical
+  if (canvas.height > canvas.width) {
+    let tempCanvas = document.createElement("canvas");
+    tempCanvas.width = canvas.height;
+    tempCanvas.height = canvas.width;
 
-  cv.findContours(edges,contours,hierarchy,cv.RETR_LIST,cv.CHAIN_APPROX_SIMPLE);
+    let tctx = tempCanvas.getContext("2d");
+    tctx.translate(tempCanvas.width / 2, tempCanvas.height / 2);
+    tctx.rotate(90 * Math.PI / 180);
+    tctx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
 
-  let biggest=null,maxArea=0;
-
-  for(let i=0;i<contours.size();i++){
-    let cnt=contours.get(i);
-    let area=cv.contourArea(cnt);
-    if(area>maxArea){
-      let peri=cv.arcLength(cnt,true);
-      let approx=new cv.Mat();
-      cv.approxPolyDP(cnt,approx,0.02*peri,true);
-      if(approx.rows===4){ biggest=approx; maxArea=area; }
-    }
+    canvas.width = tempCanvas.width;
+    canvas.height = tempCanvas.height;
+    ctx.drawImage(tempCanvas, 0, 0);
   }
-
-  if(biggest){
-    let pts=[];
-    for(let i=0;i<4;i++){
-      pts.push({x:biggest.intPtr(i,0)[0], y:biggest.intPtr(i,0)[1]});
-    }
-
-    pts.sort((a,b)=>a.y-b.y);
-    let top=pts.slice(0,2).sort((a,b)=>a.x-b.x);
-    let bottom=pts.slice(2,4).sort((a,b)=>a.x-b.x);
-    let ordered=[top[0],top[1],bottom[1],bottom[0]];
-
-    let width=800,height=500;
-
-    let dst=cv.matFromArray(4,1,cv.CV_32FC2,[0,0,width,0,width,height,0,height]);
-    let srcTri=cv.matFromArray(4,1,cv.CV_32FC2,[
-      ordered[0].x,ordered[0].y,
-      ordered[1].x,ordered[1].y,
-      ordered[2].x,ordered[2].y,
-      ordered[3].x,ordered[3].y
-    ]);
-
-    let M=cv.getPerspectiveTransform(srcTri,dst);
-    let warped=new cv.Mat();
-    cv.warpPerspective(src,warped,M,new cv.Size(width,height));
-    cv.imshow("canvas",warped);
-
-    warped.delete(); srcTri.delete(); dst.delete(); M.delete();
-  }
-
-  gray.delete(); edges.delete(); contours.delete(); hierarchy.delete();
 
   document.getElementById("preview").src = canvas.toDataURL("image/png");
+
   runOCR(canvas);
 }
 
-async function runOCR(image){
-  status.innerText="Scanning...";
-  const {data:{text}} = await Tesseract.recognize(image,"eng",{
-    tessedit_char_whitelist:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@.+-()/,:& "
+/* OCR */
+
+async function runOCR(image) {
+
+  status.innerText = "Scanning...";
+
+  const { data: { text } } = await Tesseract.recognize(image, "eng", {
+    tessedit_char_whitelist:
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@.+-()/,:& "
   });
+
   parseDetails(text);
-  status.innerText="Scan Complete ✔";
+
+  status.innerText = "Scan Complete ✔";
 }
 
-function parseDetails(text){
-  const lines=text.split("\n").map(l=>l.trim()).filter(l=>l.length>2);
+/* DATA EXTRACTION */
 
-  const emailMatch=text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
-  const phoneMatch=text.match(/(\+91[\s-]?\d{10}|\b\d{10}\b)/);
-  const websiteMatch=text.match(/(www\.[^\s]+|https?:\/\/[^\s]+)/i);
+function parseDetails(text) {
 
-  email.value=emailMatch?emailMatch[0]:"";
-  mobile.value=phoneMatch?phoneMatch[0].replace(/\D/g,''):"";
-  website.value=websiteMatch?websiteMatch[0]:"";
+  const lines = text.split("\n")
+    .map(l => l.trim())
+    .filter(l => l.length > 2);
 
-  name.value=lines[0]||"";
-  company.value=lines.find(l=>/(pharma|healthcare|laboratories|limited|pvt|ltd|oncology)/i.test(l))||"";
-  designation.value=lines.find(l=>/(manager|director|executive|sales|business|vice)/i.test(l))||"";
+  const emailMatch = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  const phoneMatch = text.match(/(\+91[\s-]?\d{10}|\b\d{10}\b)/);
+  const websiteMatch = text.match(/(www\.[^\s]+|https?:\/\/[^\s]+)/i);
+
+  email.value = emailMatch ? emailMatch[0] : "";
+  mobile.value = phoneMatch ? phoneMatch[0].replace(/\D/g,'') : "";
+  website.value = websiteMatch ? websiteMatch[0] : "";
+
+  name.value = lines[0] || "";
+
+  company.value = lines.find(l =>
+    /(pharma|healthcare|laboratories|limited|pvt|ltd|oncology|india)/i.test(l)
+  ) || "";
+
+  designation.value = lines.find(l =>
+    /(manager|director|executive|sales|business|vice|president|account)/i.test(l)
+  ) || "";
 }
 
-async function submitToSheet(){
+/* GOOGLE SHEET SAVE + DUPLICATE CHECK */
 
-  const data={
-    name:name.value,
-    company:company.value,
-    designation:designation.value,
-    mobile:mobile.value,
-    email:email.value,
-    website:website.value
+async function submitToSheet() {
+
+  const data = {
+    name: name.value,
+    company: company.value,
+    designation: designation.value,
+    mobile: mobile.value,
+    email: email.value,
+    website: website.value
   };
 
-  if(!data.mobile && !data.email){
+  if (!data.mobile && !data.email) {
     alert("Mobile or Email required.");
     return;
   }
 
-  status.innerText="Checking duplicate...";
+  status.innerText = "Checking duplicate...";
 
-  const check=await fetch(GOOGLE_SCRIPT_URL+`?mobile=${data.mobile}&email=${data.email}`);
-  const result=await check.text();
+  const check = await fetch(
+    GOOGLE_SCRIPT_URL + `?mobile=${data.mobile}&email=${data.email}`
+  );
 
-  if(result==="DUPLICATE"){
+  const result = await check.text();
+
+  if (result === "DUPLICATE") {
     alert("Duplicate record found!");
-    status.innerText="Duplicate.";
+    status.innerText = "Duplicate.";
     return;
   }
 
-  status.innerText="Saving...";
+  status.innerText = "Saving...";
 
-  await fetch(GOOGLE_SCRIPT_URL,{
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body:JSON.stringify(data)
+  await fetch(GOOGLE_SCRIPT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
   });
 
   alert("Saved Successfully ✔");
-  status.innerText="Saved ✔";
+  status.innerText = "Saved ✔";
 }
 
-if('serviceWorker' in navigator){
+/* SERVICE WORKER */
+
+if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./service-worker.js');
 }
 
