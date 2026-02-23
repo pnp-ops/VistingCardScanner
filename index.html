@@ -1,103 +1,117 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Universal Visiting Card OCR Scanner</title>
-  <link rel="manifest" href="manifest.json" />
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #0f172a;
-      color: #fff;
-    }
-    .container {
-      max-width: 500px;
-      margin: auto;
-      padding: 16px;
-    }
-    h2 {
-      text-align: center;
-      color: #38bdf8;
-    }
-    video, canvas, img {
-      width: 100%;
-      border-radius: 12px;
-      margin-top: 10px;
-    }
-    button {
-      width: 100%;
-      padding: 12px;
-      margin-top: 10px;
-      border: none;
-      border-radius: 10px;
-      font-size: 16px;
-      background: #2563eb;
-      color: white;
-      cursor: pointer;
-    }
-    input {
-      width: 100%;
-      padding: 10px;
-      margin-top: 8px;
-      border-radius: 8px;
-      border: 1px solid #334155;
-      background: #020617;
-      color: #fff;
-    }
-    .status {
-      text-align: center;
-      margin-top: 10px;
-      font-size: 14px;
-      color: #94a3b8;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visiting Card OCR Scanner</title>
+
+<link rel="manifest" href="manifest.json" />
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial;
+  background: #0f172a;
+  color: white;
+}
+.container {
+  max-width: 500px;
+  margin: auto;
+  padding: 16px;
+}
+button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  border-radius: 10px;
+  border: none;
+  background: #2563eb;
+  color: white;
+  font-size: 16px;
+}
+input {
+  width: 100%;
+  padding: 10px;
+  margin-top: 8px;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #020617;
+  color: white;
+}
+#cameraSection {
+  display: none;
+  position: relative;
+}
+#video {
+  width: 100%;
+  border-radius: 12px;
+}
+.card-overlay {
+  position: absolute;
+  top: 20%;
+  left: 10%;
+  width: 80%;
+  height: 50%;
+  border: 3px dashed #38bdf8;
+  border-radius: 8px;
+  pointer-events: none;
+}
+</style>
 </head>
+
 <body>
-  <div class="container">
-    <h2>Universal Visiting Card Scanner</h2>
+<div class="container">
 
-    <video id="video" autoplay playsinline></video>
-    <button onclick="captureImage()">Capture Card</button>
-    <input type="file" accept="image/*" onchange="uploadImage(event)" />
+<h2>Visiting Card Scanner</h2>
 
-    <canvas id="canvas" style="display:none;"></canvas>
-    <img id="preview" />
+<button onclick="openCamera()">📷 Scan Card</button>
 
-    <div class="status" id="status">Ready to scan...</div>
+<div id="cameraSection">
+  <video id="video" playsinline></video>
+  <div class="card-overlay"></div>
+  <button onclick="captureImage()">Capture</button>
+  <button onclick="closeCamera()">Close</button>
+</div>
 
-    <input id="name" placeholder="Name" />
-    <input id="company" placeholder="Company / Hospital" />
-    <input id="designation" placeholder="Designation" />
-    <input id="mobile" placeholder="Mobile" />
-    <input id="email" placeholder="Email" />
-    <input id="website" placeholder="Website" />
+<canvas id="canvas" style="display:none;"></canvas>
+<img id="preview" width="100%" />
 
-    <button onclick="submitToSheet()">Submit to Google Sheet</button>
-  </div>
+<div id="status">Ready...</div>
+
+<input id="name" placeholder="Name">
+<input id="company" placeholder="Company">
+<input id="designation" placeholder="Designation">
+<input id="mobile" placeholder="Mobile">
+<input id="email" placeholder="Email">
+<input id="website" placeholder="Website">
+
+<button onclick="submitToSheet()">Save to Google Sheet</button>
+
+</div>
 
 <script>
+
 let stream;
-const GOOGLE_SCRIPT_URL = "https://script.google.com/a/macros/1mg.com/s/AKfycbzcPmeMEi0N-nnZHWrk3O9ouosrxnsPC18lSc07iPwDTi5nRw56xQfTGT_U6s0iiBvrFw/exec"; // 🔴 Replace this
+const GOOGLE_SCRIPT_URL = "PASTE_YOUR_SCRIPT_URL_HERE";
 
-// Start Back Camera (Mobile Optimized)
-async function startCamera() {
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: "environment" } },
-      audio: false
-    });
-    document.getElementById("video").srcObject = stream;
-  } catch (err) {
-    document.getElementById("status").innerText = "Camera access denied or not supported.";
-  }
+async function openCamera() {
+  document.getElementById("cameraSection").style.display = "block";
+  stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "environment" }
+  });
+  video.srcObject = stream;
+  video.play();
 }
-startCamera();
 
-function captureImage() {
-  const video = document.getElementById("video");
+function closeCamera() {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  document.getElementById("cameraSection").style.display = "none";
+}
+
+async function captureImage() {
   const canvas = document.getElementById("canvas");
   const ctx = canvas.getContext("2d");
 
@@ -105,94 +119,163 @@ function captureImage() {
   canvas.height = video.videoHeight;
   ctx.drawImage(video, 0, 0);
 
-  const imageData = canvas.toDataURL("image/png");
-  document.getElementById("preview").src = imageData;
+  closeCamera();
+  processCard(canvas);
+}
+
+function processCard(canvas) {
+
+  let src = cv.imread(canvas);
+  let gray = new cv.Mat();
+  let edges = new cv.Mat();
+  let contours = new cv.MatVector();
+  let hierarchy = new cv.Mat();
+
+  cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+  cv.GaussianBlur(gray, gray, new cv.Size(5,5), 0);
+  cv.Canny(gray, edges, 75, 200);
+
+  cv.findContours(edges, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+
+  let biggest = null;
+  let maxArea = 0;
+
+  for (let i=0; i<contours.size(); i++) {
+    let cnt = contours.get(i);
+    let area = cv.contourArea(cnt);
+    if (area > maxArea) {
+      let peri = cv.arcLength(cnt, true);
+      let approx = new cv.Mat();
+      cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
+      if (approx.rows === 4) {
+        biggest = approx;
+        maxArea = area;
+      }
+    }
+  }
+
+  if (biggest) {
+    let pts = [];
+    for (let i=0; i<4; i++) {
+      pts.push({
+        x: biggest.intPtr(i,0)[0],
+        y: biggest.intPtr(i,0)[1]
+      });
+    }
+
+    pts.sort((a,b)=>a.y-b.y);
+    let top = pts.slice(0,2).sort((a,b)=>a.x-b.x);
+    let bottom = pts.slice(2,4).sort((a,b)=>a.x-b.x);
+    let ordered = [top[0], top[1], bottom[1], bottom[0]];
+
+    let width = 800;
+    let height = 500;
+
+    let dst = cv.matFromArray(4,1,cv.CV_32FC2,[0,0,width,0,width,height,0,height]);
+    let srcTri = cv.matFromArray(4,1,cv.CV_32FC2,[
+      ordered[0].x,ordered[0].y,
+      ordered[1].x,ordered[1].y,
+      ordered[2].x,ordered[2].y,
+      ordered[3].x,ordered[3].y
+    ]);
+
+    let M = cv.getPerspectiveTransform(srcTri, dst);
+    let warped = new cv.Mat();
+    cv.warpPerspective(src, warped, M, new cv.Size(width,height));
+    cv.imshow("canvas", warped);
+
+    warped.delete(); srcTri.delete(); dst.delete(); M.delete();
+  }
+
+  gray.delete(); edges.delete(); contours.delete(); hierarchy.delete();
+
+  document.getElementById("preview").src = canvas.toDataURL("image/png");
   runOCR(canvas);
 }
 
-function uploadImage(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const img = document.getElementById("preview");
-  img.src = URL.createObjectURL(file);
-  img.onload = () => runOCR(img);
-}
-
 async function runOCR(image) {
-  document.getElementById("status").innerText = "Scanning card... Improving OCR accuracy";
+
+  document.getElementById("status").innerText = "Scanning...";
 
   const { data: { text } } = await Tesseract.recognize(image, "eng", {
-    logger: m => console.log(m)
+    tessedit_char_whitelist:
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@.+-()/,:& "
   });
 
   parseDetails(text);
-  document.getElementById("status").innerText = "Scan completed ✔";
+  document.getElementById("status").innerText = "Scan Complete ✔";
 }
 
 function parseDetails(text) {
-  const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 2);
 
-  const emailMatch = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-z]{2,}/i);
-  const phoneMatch = text.match(/(\+?\d[\d\s\-()]{8,18}\d)/);
+  const lines = text.split("\n").map(l=>l.trim()).filter(l=>l.length>2);
+
+  const emailMatch = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  const phoneMatch = text.match(/(\+91[\s-]?\d{10}|\b\d{10}\b)/);
   const websiteMatch = text.match(/(www\.[^\s]+|https?:\/\/[^\s]+)/i);
 
-  document.getElementById("email").value = emailMatch ? emailMatch[0] : "";
-  document.getElementById("mobile").value = phoneMatch ? phoneMatch[0].replace(/[^\d+]/g, '') : "";
-  document.getElementById("website").value = websiteMatch ? websiteMatch[0] : "";
+  email.value = emailMatch ? emailMatch[0] : "";
+  mobile.value = phoneMatch ? phoneMatch[0].replace(/\D/g,'') : "";
+  website.value = websiteMatch ? websiteMatch[0] : "";
 
-  // Doctor + Universal Name Detection (Medical Bias Added but not restricted)
-  let name = lines.find(l => /^(dr\.?\s)/i.test(l) || /(MBBS|MD|MS|DM|DNB)/i.test(l));
-  if (name) name = name.replace(/,?\s*(MBBS|MD|MS|DM|DNB).*$/i, "");
-  if (!name) name = lines.find(l => /^[A-Z][a-z]+\s[A-Z][a-z]+/.test(l));
-  if (!name) name = lines[0] || "";
-  document.getElementById("name").value = name;
+  name.value = lines[0] || "";
 
-  // Company Detection (Hospital + Corporate)
-  let company = lines.find(l =>
-    /hospital|clinic|healthcare|labs|diagnostics|pharma|ltd|pvt|inc|technologies|solutions|company|group/i.test(l)
-  );
-  document.getElementById("company").value = company || "";
+  company.value = lines.find(l =>
+    /(pharma|healthcare|laboratories|limited|pvt|ltd|oncology)/i.test(l)
+  ) || "";
 
-  // Designation Detection
-  let designation = lines.find(l =>
-    /doctor|cardiologist|manager|director|engineer|consultant|sales|marketing|ceo|founder|head/i.test(l)
-  );
-  document.getElementById("designation").value = designation || "";
+  designation.value = lines.find(l =>
+    /(manager|director|executive|sales|business|vice)/i.test(l)
+  ) || "";
 }
 
-// Duplicate Check + Google Sheet Sync
 async function submitToSheet() {
+
   const data = {
-    name: document.getElementById("name").value,
-    company: document.getElementById("company").value,
-    designation: document.getElementById("designation").value,
-    mobile: document.getElementById("mobile").value,
-    email: document.getElementById("email").value,
-    website: document.getElementById("website").value
+    name: name.value,
+    company: company.value,
+    designation: designation.value,
+    mobile: mobile.value,
+    email: email.value,
+    website: website.value
   };
 
   if (!data.mobile && !data.email) {
-    alert("Mobile or Email required to avoid duplicates.");
+    alert("Mobile or Email required.");
     return;
   }
 
-  document.getElementById("status").innerText = "Syncing to Google Sheet...";
+  status.innerText = "Checking duplicate...";
 
-  try {
-    const res = await fetch(GOOGLE_SCRIPT_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data)
-    });
+  const check = await fetch(
+    GOOGLE_SCRIPT_URL + `?mobile=${data.mobile}&email=${data.email}`
+  );
 
-    document.getElementById("status").innerText = "Saved to Google Sheet ✔";
-    alert("Data synced to Google Sheet successfully!");
-  } catch (error) {
-    document.getElementById("status").innerText = "Sync failed. Check script URL.";
-    alert("Google Sheet sync failed.");
+  const result = await check.text();
+
+  if (result === "DUPLICATE") {
+    alert("Duplicate record found!");
+    status.innerText = "Duplicate.";
+    return;
   }
+
+  status.innerText = "Saving...";
+
+  await fetch(GOOGLE_SCRIPT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  });
+
+  alert("Saved Successfully ✔");
+  status.innerText = "Saved ✔";
 }
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./service-worker.js');
+}
+
 </script>
+
 </body>
 </html>
