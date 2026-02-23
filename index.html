@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Visiting Card OCR Scanner</title>
 
-<link rel="manifest" href="manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <style>
@@ -85,9 +84,13 @@ input{
 <script>
 
 let stream;
-const GOOGLE_SCRIPT_URL = "https://script.google.com/a/macros/1mg.com/s/AKfycbzcPmeMEi0N-nnZHWrk3O9ouosrxnsPC18lSc07iPwDTi5nRw56xQfTGT_U6s0iiBvrFw/exec";
 
-/* ================= CAMERA ================= */
+/* ================== IMPORTANT ================== */
+/* REPLACE THIS WITH YOUR GOOGLE APPS SCRIPT URL  */
+const GOOGLE_SCRIPT_URL = "https://script.google.com/a/macros/1mg.com/s/AKfycbzcPmeMEi0N-nnZHWrk3O9ouosrxnsPC18lSc07iPwDTi5nRw56xQfTGT_U6s0iiBvrFw/exec";
+/* =============================================== */
+
+/* CAMERA */
 
 async function openCamera(){
   document.getElementById("cameraSection").style.display="block";
@@ -115,7 +118,7 @@ function captureImage(){
   processImage(canvas);
 }
 
-/* ================= UPLOAD ================= */
+/* UPLOAD */
 
 function uploadImage(event){
   const file=event.target.files[0];
@@ -135,7 +138,7 @@ function uploadImage(event){
   img.src=URL.createObjectURL(file);
 }
 
-/* ================= IMAGE PROCESS ================= */
+/* IMAGE PROCESS */
 
 function processImage(canvas){
 
@@ -173,28 +176,25 @@ function processImage(canvas){
   runOCR(canvas);
 }
 
-/* ================= OCR ================= */
+/* OCR */
 
 async function runOCR(image){
 
   status.innerText="Scanning...";
 
-  const {data:{text}} = await Tesseract.recognize(image,"eng",{
-    tessedit_char_whitelist:
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@.+-()/,:& "
-  });
+  const {data:{text}} = await Tesseract.recognize(image,"eng");
 
   parseDetails(text);
   status.innerText="Scan Complete ✔";
 }
 
-/* ================= SMART EXTRACTION ================= */
+/* SMART EXTRACTION */
 
 function parseDetails(text){
 
-  text=text.replace(/\r/g,"");
+  text = text.replace(/\r/g,"");
 
-  const lines=text
+  const rawLines = text
     .split("\n")
     .map(l=>l.trim())
     .filter(l=>l.length>2);
@@ -203,59 +203,68 @@ function parseDetails(text){
   const emailMatch=text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
   email.value=emailMatch?emailMatch[0]:"";
 
-  /* MOBILE */
-  const phoneMatch=text.match(/(\+91[\s-]?\d{10}|\b\d{10}\b)/);
-  mobile.value=phoneMatch?phoneMatch[0].replace(/\D/g,""):"";
+  /* PHONE */
+  const phones=text.match(/(\+91[\s-]?\d{10}|\b[6-9]\d{9}\b)/g);
+  mobile.value=phones?phones[0].replace(/\D/g,""):"";
 
   /* WEBSITE */
   const websiteMatch=text.match(/(www\.[^\s]+|https?:\/\/[^\s]+)/i);
   website.value=websiteMatch?websiteMatch[0]:"";
 
+  const companyKeywords=["pharma","pharmaceutical","healthcare","laboratories","limited","pvt","ltd","india","solutions","oncology"];
+  const designationKeywords=["manager","director","executive","sales","business","vice","president","account","area","head","officer"];
+
   /* DESIGNATION */
-  const desigKeywords=["manager","director","executive","sales","business","vice","president","account","area","head","officer"];
-
-  let detectedDesignation=lines.find(l=>
-    desigKeywords.some(k=>l.toLowerCase().includes(k))
+  let detectedDesignation=rawLines.find(line =>
+    designationKeywords.some(k=>line.toLowerCase().includes(k))
   );
-
   designation.value=detectedDesignation||"";
 
-  /* NAME (line above designation) */
+  /* NAME (confidence scoring) */
+  let bestName="";
+  let bestScore=0;
 
-  let detectedName="";
+  rawLines.forEach(line=>{
+    let score=0;
 
-  if(detectedDesignation){
-    const index=lines.indexOf(detectedDesignation);
-    if(index>0){
-      const candidate=lines[index-1];
-      if(!candidate.match(/\d|@|www|pharma|limited|ltd|pvt/i)){
-        detectedName=candidate;
-      }
+    if(companyKeywords.some(k=>line.toLowerCase().includes(k))) return;
+    if(/\d|@|www/i.test(line)) return;
+    if(line===line.toUpperCase()) score-=2;
+
+    if(/^[A-Z][a-z]+(\s[A-Z][a-z]+)+$/.test(line)) score+=3;
+
+    const words=line.split(" ").length;
+    if(words>=2 && words<=3) score+=2;
+
+    if(score>bestScore){
+      bestScore=score;
+      bestName=line;
     }
-  }
+  });
 
-  if(!detectedName){
-    detectedName=lines.find(l=>
-      /^[A-Z][a-z]+(\s[A-Z][a-z]+)+$/.test(l)
-    );
-  }
-
-  name.value=detectedName||"";
+  name.value=bestName||"";
 
   /* COMPANY */
+  let bestCompany="";
+  rawLines.forEach(line=>{
+    if(companyKeywords.some(k=>line.toLowerCase().includes(k))){
+      if(line.length>bestCompany.length){
+        bestCompany=line;
+      }
+    }
+  });
 
-  const compKeywords=["pharma","pharmaceutical","healthcare","laboratories","limited","pvt","ltd","india","solutions","oncology"];
-
-  let detectedCompany=lines.find(l=>
-    compKeywords.some(k=>l.toLowerCase().includes(k))
-  );
-
-  company.value=detectedCompany||"";
+  company.value=bestCompany||"";
 }
 
-/* ================= GOOGLE SHEET ================= */
+/* GOOGLE SHEET SAVE */
 
 async function submitToSheet(){
+
+  if(GOOGLE_SCRIPT_URL==="PASTE_YOUR_SCRIPT_URL_HERE"){
+    alert("Please replace GOOGLE_SCRIPT_URL in code.");
+    return;
+  }
 
   const data={
     name:name.value,
@@ -295,12 +304,6 @@ async function submitToSheet(){
 
   alert("Saved Successfully ✔");
   status.innerText="Saved ✔";
-}
-
-/* ================= SERVICE WORKER ================= */
-
-if("serviceWorker" in navigator){
-  navigator.serviceWorker.register("./service-worker.js");
 }
 
 </script>
