@@ -10,42 +10,45 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <style>
-body {
-  margin: 0;
-  font-family: Arial;
-  background: #0f172a;
-  color: white;
+body{
+  margin:0;
+  font-family:Arial;
+  background:#0f172a;
+  color:white;
 }
-.container {
-  max-width: 500px;
-  margin: auto;
-  padding: 16px;
+.container{
+  max-width:500px;
+  margin:auto;
+  padding:16px;
 }
-button {
-  width: 100%;
-  padding: 12px;
-  margin-top: 10px;
-  border-radius: 10px;
-  border: none;
-  background: #2563eb;
-  color: white;
-  font-size: 16px;
+button{
+  width:100%;
+  padding:12px;
+  margin-top:10px;
+  border-radius:10px;
+  border:none;
+  background:#2563eb;
+  color:white;
+  font-size:16px;
 }
-input {
-  width: 100%;
-  padding: 10px;
-  margin-top: 8px;
-  border-radius: 8px;
-  border: 1px solid #334155;
-  background: #020617;
-  color: white;
+input{
+  width:100%;
+  padding:10px;
+  margin-top:8px;
+  border-radius:8px;
+  border:1px solid #334155;
+  background:#020617;
+  color:white;
 }
-#cameraSection {
-  display: none;
+#cameraSection{
+  display:none;
 }
-#video {
-  width: 100%;
-  border-radius: 12px;
+#video{
+  width:100%;
+  border-radius:12px;
+}
+#status{
+  margin-top:10px;
 }
 </style>
 </head>
@@ -85,189 +88,209 @@ input {
 let stream;
 const GOOGLE_SCRIPT_URL = "https://script.google.com/a/macros/1mg.com/s/AKfycbzcPmeMEi0N-nnZHWrk3O9ouosrxnsPC18lSc07iPwDTi5nRw56xQfTGT_U6s0iiBvrFw/exec";
 
-/* CAMERA CONTROL */
+/* CAMERA */
 
-async function openCamera() {
-  document.getElementById("cameraSection").style.display = "block";
+async function openCamera(){
+  document.getElementById("cameraSection").style.display="block";
   stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: "environment" }
+    video:{facingMode:"environment"}
   });
-  video.srcObject = stream;
+  video.srcObject=stream;
   video.play();
 }
 
-function closeCamera() {
-  if (stream) stream.getTracks().forEach(track => track.stop());
-  document.getElementById("cameraSection").style.display = "none";
+function closeCamera(){
+  if(stream) stream.getTracks().forEach(track=>track.stop());
+  document.getElementById("cameraSection").style.display="none";
 }
 
-function captureImage() {
-  const canvas = document.getElementById("canvas");
-  const ctx = canvas.getContext("2d");
+function captureImage(){
+  const canvas=document.getElementById("canvas");
+  const ctx=canvas.getContext("2d");
 
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
+  canvas.width=video.videoWidth;
+  canvas.height=video.videoHeight;
 
-  ctx.drawImage(video, 0, 0);
+  ctx.drawImage(video,0,0);
 
   closeCamera();
   processImage(canvas);
 }
 
-/* UPLOAD IMAGE */
+/* UPLOAD */
 
-function uploadImage(event) {
-  const file = event.target.files[0];
-  if (!file) return;
+function uploadImage(event){
+  const file=event.target.files[0];
+  if(!file) return;
 
-  const img = new Image();
-  img.onload = function () {
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
+  const img=new Image();
+  img.onload=function(){
+    const canvas=document.getElementById("canvas");
+    const ctx=canvas.getContext("2d");
 
-    canvas.width = img.width;
-    canvas.height = img.height;
+    canvas.width=img.width;
+    canvas.height=img.height;
 
-    ctx.drawImage(img, 0, 0);
-
+    ctx.drawImage(img,0,0);
     processImage(canvas);
   };
-  img.src = URL.createObjectURL(file);
+  img.src=URL.createObjectURL(file);
 }
 
-/* IMAGE PROCESSING (Stable Version) */
+/* IMAGE PROCESSING */
 
-function processImage(canvas) {
+function processImage(canvas){
 
-  const ctx = canvas.getContext("2d");
+  const ctx=canvas.getContext("2d");
+  let imgData=ctx.getImageData(0,0,canvas.width,canvas.height);
+  let data=imgData.data;
 
-  let imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  let data = imgData.data;
+  let contrast=40;
+  let factor=(259*(contrast+255))/(255*(259-contrast));
 
-  // Contrast boost for better OCR
-  let contrast = 40;
-  let factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
-
-  for (let i = 0; i < data.length; i += 4) {
-    data[i]     = factor * (data[i] - 128) + 128;
-    data[i + 1] = factor * (data[i + 1] - 128) + 128;
-    data[i + 2] = factor * (data[i + 2] - 128) + 128;
+  for(let i=0;i<data.length;i+=4){
+    data[i]=factor*(data[i]-128)+128;
+    data[i+1]=factor*(data[i+1]-128)+128;
+    data[i+2]=factor*(data[i+2]-128)+128;
   }
 
-  ctx.putImageData(imgData, 0, 0);
+  ctx.putImageData(imgData,0,0);
 
-  // Auto rotate if vertical
-  if (canvas.height > canvas.width) {
-    let tempCanvas = document.createElement("canvas");
-    tempCanvas.width = canvas.height;
-    tempCanvas.height = canvas.width;
+  if(canvas.height>canvas.width){
+    let temp=document.createElement("canvas");
+    temp.width=canvas.height;
+    temp.height=canvas.width;
 
-    let tctx = tempCanvas.getContext("2d");
-    tctx.translate(tempCanvas.width / 2, tempCanvas.height / 2);
-    tctx.rotate(90 * Math.PI / 180);
-    tctx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
+    let tctx=temp.getContext("2d");
+    tctx.translate(temp.width/2,temp.height/2);
+    tctx.rotate(90*Math.PI/180);
+    tctx.drawImage(canvas,-canvas.width/2,-canvas.height/2);
 
-    canvas.width = tempCanvas.width;
-    canvas.height = tempCanvas.height;
-    ctx.drawImage(tempCanvas, 0, 0);
+    canvas.width=temp.width;
+    canvas.height=temp.height;
+    ctx.drawImage(temp,0,0);
   }
 
-  document.getElementById("preview").src = canvas.toDataURL("image/png");
-
+  preview.src=canvas.toDataURL("image/png");
   runOCR(canvas);
 }
 
 /* OCR */
 
-async function runOCR(image) {
+async function runOCR(image){
 
-  status.innerText = "Scanning...";
+  status.innerText="Scanning...";
 
-  const { data: { text } } = await Tesseract.recognize(image, "eng", {
+  const {data:{text}} = await Tesseract.recognize(image,"eng",{
     tessedit_char_whitelist:
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@.+-()/,:& "
   });
 
   parseDetails(text);
-
-  status.innerText = "Scan Complete ✔";
+  status.innerText="Scan Complete ✔";
 }
 
-/* DATA EXTRACTION */
+/* SMART DATA EXTRACTION */
 
-function parseDetails(text) {
+function parseDetails(text){
 
-  const lines = text.split("\n")
-    .map(l => l.trim())
-    .filter(l => l.length > 2);
+  const cleaned=text
+    .replace(/\|/g,"")
+    .replace(/Ph:/gi,"")
+    .replace(/Mob:/gi,"")
+    .replace(/M:/gi,"")
+    .replace(/T:/gi,"")
+    .replace(/E-mail:/gi,"")
+    .replace(/Email:/gi,"")
+    .trim();
 
-  const emailMatch = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
-  const phoneMatch = text.match(/(\+91[\s-]?\d{10}|\b\d{10}\b)/);
-  const websiteMatch = text.match(/(www\.[^\s]+|https?:\/\/[^\s]+)/i);
+  const lines=text
+    .split("\n")
+    .map(l=>l.trim())
+    .filter(l=>l.length>2);
 
-  email.value = emailMatch ? emailMatch[0] : "";
-  mobile.value = phoneMatch ? phoneMatch[0].replace(/\D/g,'') : "";
-  website.value = websiteMatch ? websiteMatch[0] : "";
+  /* EMAIL */
+  const emailMatch=cleaned.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  email.value=emailMatch?emailMatch[0]:"";
 
-  name.value = lines[0] || "";
+  /* MOBILE */
+  const phoneMatch=cleaned.match(/(\+91[\s-]?\d{10}|\b\d{10}\b)/);
+  mobile.value=phoneMatch?phoneMatch[0].replace(/\D/g,""):"";
 
-  company.value = lines.find(l =>
-    /(pharma|healthcare|laboratories|limited|pvt|ltd|oncology|india)/i.test(l)
-  ) || "";
+  /* WEBSITE */
+  const websiteMatch=cleaned.match(/(www\.[^\s]+|https?:\/\/[^\s]+)/i);
+  website.value=websiteMatch?websiteMatch[0]:"";
 
-  designation.value = lines.find(l =>
-    /(manager|director|executive|sales|business|vice|president|account)/i.test(l)
-  ) || "";
+  /* DESIGNATION */
+  const desigKeywords=["manager","director","executive","sales","business","vice","president","account","area","head"];
+  designation.value=lines.find(l=>desigKeywords.some(k=>l.toLowerCase().includes(k)))||"";
+
+  /* NAME */
+  let detectedName=lines.find(l=>/^[A-Z][a-z]+(\s[A-Z][a-z]+)+$/.test(l));
+
+  if(!detectedName){
+    detectedName=lines.find(l=>
+      !l.match(/\d|@|www/i) &&
+      l.length<35 &&
+      l.split(" ").length<=4
+    );
+  }
+
+  name.value=detectedName||"";
+
+  /* COMPANY */
+  const compKeywords=["pharma","pharmaceutical","healthcare","laboratories","limited","pvt","ltd","india","solutions","oncology"];
+  company.value=lines.find(l=>compKeywords.some(k=>l.toLowerCase().includes(k)))||"";
 }
 
-/* GOOGLE SHEET SAVE + DUPLICATE CHECK */
+/* GOOGLE SHEET SAVE */
 
-async function submitToSheet() {
+async function submitToSheet(){
 
-  const data = {
-    name: name.value,
-    company: company.value,
-    designation: designation.value,
-    mobile: mobile.value,
-    email: email.value,
-    website: website.value
+  const data={
+    name:name.value,
+    company:company.value,
+    designation:designation.value,
+    mobile:mobile.value,
+    email:email.value,
+    website:website.value
   };
 
-  if (!data.mobile && !data.email) {
+  if(!data.mobile && !data.email){
     alert("Mobile or Email required.");
     return;
   }
 
-  status.innerText = "Checking duplicate...";
+  status.innerText="Checking duplicate...";
 
-  const check = await fetch(
-    GOOGLE_SCRIPT_URL + `?mobile=${data.mobile}&email=${data.email}`
+  const check=await fetch(
+    GOOGLE_SCRIPT_URL+`?mobile=${data.mobile}&email=${data.email}`
   );
 
-  const result = await check.text();
+  const result=await check.text();
 
-  if (result === "DUPLICATE") {
+  if(result==="DUPLICATE"){
     alert("Duplicate record found!");
-    status.innerText = "Duplicate.";
+    status.innerText="Duplicate.";
     return;
   }
 
-  status.innerText = "Saving...";
+  status.innerText="Saving...";
 
-  await fetch(GOOGLE_SCRIPT_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data)
+  await fetch(GOOGLE_SCRIPT_URL,{
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body:JSON.stringify(data)
   });
 
   alert("Saved Successfully ✔");
-  status.innerText = "Saved ✔";
+  status.innerText="Saved ✔";
 }
 
 /* SERVICE WORKER */
 
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./service-worker.js');
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("./service-worker.js");
 }
 
 </script>
