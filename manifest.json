@@ -1,19 +1,21 @@
 {
-  "name": "Universal Visiting Card OCR Scanner",
+  "name": "Visiting Card OCR Scanner",
   "short_name": "Card OCR",
   "start_url": "./index.html",
+  "scope": "./",
+  "id": "./",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#2563eb",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/2920/2920277.png",
+      "src": "icon-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/2920/2920277.png",
+      "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
